@@ -44,8 +44,14 @@ def store(content: str, *, category: Category, source: str, confidence: float = 
         "created_at": time.time(),
     }
     _MEMORIES[mem["id"]] = mem
+    from app.core import persistence
+    persistence.save(persistence.TABLE_MEMORIES, mem["id"], mem)
     audit.record(source, f"memory_stored:{category.value}", mission_id=mission_id)
     return mem
+
+
+def restore(doc: dict) -> None:
+    _MEMORIES[doc["id"]] = doc
 
 
 def retrieve(query: str = "", *, category: str | None = None, limit: int = 20) -> list[dict]:

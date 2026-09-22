@@ -15,6 +15,11 @@ _NOTIFICATIONS: list[dict] = []
 _listener_task: asyncio.Task | None = None
 
 
+def restore(doc: dict) -> None:
+    if not any(n["id"] == doc["id"] for n in _NOTIFICATIONS):
+        _NOTIFICATIONS.append(doc)
+
+
 async def _listen():
     q = bus.subscribe()
     try:
@@ -30,6 +35,8 @@ async def _listen():
                     "mission_id": event["mission_id"],
                     "read": False,
                 })
+                from app.core import persistence
+                persistence.save(persistence.TABLE_NOTIFICATIONS, event["id"], _NOTIFICATIONS[-1])
     except asyncio.CancelledError:
         bus.unsubscribe(q)
 

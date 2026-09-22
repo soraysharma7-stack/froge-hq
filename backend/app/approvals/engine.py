@@ -9,6 +9,10 @@ from app.audit import log as audit
 from app.events.bus import bus, EventType
 
 
+def restore(doc: dict) -> None:
+    _APPROVALS[doc["id"]] = doc
+
+
 class ApprovalState(str, Enum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
@@ -37,6 +41,8 @@ async def request(action: str, *, requester: str, reason: str, risk: str,
         "modification": None,
     }
     _APPROVALS[ap["id"]] = ap
+    from app.core import persistence
+    persistence.save(persistence.TABLE_APPROVALS, ap["id"], ap)
     audit.record(requester, f"approval_requested:{action}", mission_id=mission_id,
                  approval_id=ap["id"], result="pending")
     await bus.publish(EventType.APPROVAL_REQUIRED,
@@ -52,6 +58,8 @@ async def resolve(approval_id: str, state: ApprovalState, *, resolver: str = "us
     if not ap or ap["state"] != ApprovalState.PENDING.value:
         return None
     ap["state"] = state.value
+    from app.core import persistence
+    persistence.save(persistence.TABLE_APPROVALS, ap["id"], ap)
     ap["resolved_at"] = time.time()
     ap["resolved_by"] = resolver
     ap["modification"] = modification

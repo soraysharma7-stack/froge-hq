@@ -66,6 +66,8 @@ class Mission:
 
     def touch(self):
         self.updated_at = time.time()
+        if MISSIONS.get(self.id) is self:
+            _persist(self)
 
     def log(self, step: str, detail: str = ""):
         self.timeline.append({"t": time.time(), "step": step, "detail": detail})
@@ -91,6 +93,39 @@ class Mission:
 
 MISSIONS: dict[str, Mission] = {}
 _SNAPSHOTS: list[dict] = []   # time machine
+
+
+def _persist(mission: Mission) -> None:
+    """Durable save of one mission (best-effort, never crashes the run)."""
+    try:
+        from app.core import persistence
+        persistence.save(persistence.TABLE_MISSIONS, mission.id, mission.to_dict())
+    except Exception:
+        pass
+
+
+def restore(doc: dict) -> None:
+    """Rebuild a mission object from durable storage at startup."""
+    m = Mission(doc["title"], doc["objective"], requester=doc.get("requester", "user"),
+                priority=doc.get("priority", "normal"), simulate=doc.get("simulate", False))
+    m.id = doc["id"]
+    m.status = MissionStatus(doc["status"])
+    m.plan = doc.get("plan", [])
+    m.current_step = doc.get("current_step", 0)
+    m.active_employees = doc.get("active_employees", [])
+    m.dependencies = doc.get("dependencies", [])
+    m.estimated_cost = doc.get("estimated_cost", 0.0)
+    m.actual_cost = doc.get("actual_cost", 0.0)
+    m.confidence = doc.get("confidence", 0.0)
+    m.outputs = doc.get("outputs", {})
+    m.approvals = doc.get("approvals", [])
+    m.errors = doc.get("errors", [])
+    m.timeline = doc.get("timeline", [])
+    m.created_at = doc.get("created_at", time.time())
+    m.updated_at = doc.get("updated_at", m.created_at)
+    m.completed_at = doc.get("completed_at")
+    m.final_summary = doc.get("final_summary")
+    MISSIONS[m.id] = m
 
 
 def list_missions() -> list[dict]:
@@ -147,6 +182,7 @@ def simulate_plan(title: str, objective: str) -> dict:
 async def run_mission(title: str, objective: str, *, simulate: bool = False) -> Mission:
     mission = Mission(title=title, objective=objective, simulate=simulate)
     MISSIONS[mission.id] = mission
+    _persist(mission)
     mission.log("MISSION_CREATED", title)
     kgraph.add_node("mission", mission.id, title)
     started = time.time()

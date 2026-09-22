@@ -6,13 +6,22 @@ from app.api.routes import router as api_router
 from app.websocket.ws import router as ws_router
 from app.config.settings import settings
 from app.notifications import center as notifications
+from app.core import db
+from app.core import persistence
 
 app = FastAPI(title=settings.app_name, version="1.0.0")
 
 
 @app.on_event("startup")
 async def _startup():
+    await db.init_db()
+    await persistence.restore_all()
     notifications.start()
+
+
+@app.on_event("shutdown")
+async def _shutdown():
+    await db.close_db()
 
 app.add_middleware(
     CORSMiddleware,

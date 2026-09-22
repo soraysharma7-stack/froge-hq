@@ -14,6 +14,7 @@ from enum import Enum
 
 from app.config.settings import settings
 from app.events.bus import bus, EventType
+from app.model_gateway.providers import provider_complete, ProviderError
 
 
 class GatewayStatus(str, Enum):
@@ -45,32 +46,38 @@ class ModelGateway:
 
     status: GatewayStatus = field(init=False, default=GatewayStatus.UNCONFIGURED)
     requests_served: int = 0
+    last_error: str | None = None
 
     def __post_init__(self) -> None:
         self.refresh_status()
 
     def refresh_status(self) -> GatewayStatus:
-        if not settings.model_name or not settings.model_provider:
+        if not settings.model_name or not settings.model_api_base:
             self.status = GatewayStatus.UNCONFIGURED
         else:
-            # Phase 1: configuration presence = ONLINE. Real health probes arrive
-            # with the provider adapter in a later phase.
-            self.status = GatewayStatus.ONLINE
+            # Configuration present. A failed provider call flips us to DEGRADED
+            # with the real error; a successful one flips back to ONLINE.
+            if self.status == GatewayStatus.UNCONFIGURED:
+                self.status = GatewayStatus.ONLINE
         return self.status
 
     def info(self) -> dict:
         return {
             "provider": settings.model_provider or None,
             "model": settings.model_name or None,
+            "api_base": settings.model_api_base or None,
+            "api_key_set": bool(settings.model_api_key),
             "status": self.status.value,
             "requests_served": self.requests_served,
+            "last_error": self.last_error,
         }
 
     async def complete(self, request: ModelRequest) -> ModelResponse:
         """Send a completion request through the configured provider.
 
-        Phase 1: if the provider is unconfigured we return a clear degraded
-        response instead of pretending a model answered.
+        If the provider is unconfigured or its call fails we return a clear
+        degraded response with the real error instead of pretending a model
+        answered.
         """
         await bus.publish(
             EventType.MODEL_REQUEST_STARTED,
@@ -82,28 +89,25 @@ class ModelGateway:
         started = time.perf_counter()
         self.refresh_status()
 
-        if self.status != GatewayStatus.ONLINE:
-            latency = (time.perf_counter() - started) * 1000
-            await bus.publish(
-                EventType.MODEL_REQUEST_COMPLETED,
-                "Model request failed: provider unconfigured",
-                source="model_gateway",
-                severity="error",
-                mission_id=request.mission_id,
-                employee_id=request.employee_id,
-            )
-            return ModelResponse(
-                text="",
-                latency_ms=latency,
-                error="MODEL_UNAVAILABLE: configured Arena AI Agent model/provider is not set. "
-                      "Set FROGE_MODEL_PROVIDER and FROGE_MODEL_NAME in the environment.",
+        if self.status == GatewayStatus.UNCONFIGURED:
+            return await self._fail(
+                request,
+                started,
+                "MODEL_UNAVAILABLE: model/provider not configured. Set FROGE_MODEL_NAME, "
+                "FROGE_MODEL_API_BASE (and FROGE_MODEL_API_KEY if needed) in the environment.",
             )
 
-        # Phase 1 placeholder adapter: the real Arena provider call lands here.
-        # We do NOT fake model output — we return a deterministic orchestration
-        # response labeled as such until the provider adapter is wired.
+        try:
+            result = await provider_complete(request.prompt, max_tokens=request.max_tokens)
+        except ProviderError as exc:
+            self.status = GatewayStatus.DEGRADED
+            self.last_error = str(exc)
+            return await self._fail(request, started, str(exc))
+
         latency = (time.perf_counter() - started) * 1000
         self.requests_served += 1
+        self.status = GatewayStatus.ONLINE
+        self.last_error = None
         await bus.publish(
             EventType.MODEL_REQUEST_COMPLETED,
             f"Model request completed in {latency:.0f}ms",
@@ -112,11 +116,20 @@ class ModelGateway:
             employee_id=request.employee_id,
             metadata={"latency_ms": latency},
         )
-        return ModelResponse(
-            text="[gateway: configured provider adapter pending — deterministic orchestrator response]",
-            latency_ms=latency,
-            usage=None,
+        return ModelResponse(text=result["text"], latency_ms=latency, usage=result.get("usage"))
+
+    async def _fail(self, request: ModelRequest, started: float, error: str) -> ModelResponse:
+        latency = (time.perf_counter() - started) * 1000
+        await bus.publish(
+            EventType.MODEL_REQUEST_COMPLETED,
+            f"Model request failed: {error[:120]}",
+            source="model_gateway",
+            severity="error",
+            mission_id=request.mission_id,
+            employee_id=request.employee_id,
+            metadata={"latency_ms": latency},
         )
+        return ModelResponse(text="", latency_ms=latency, error=error)
 
 
 gateway = ModelGateway()

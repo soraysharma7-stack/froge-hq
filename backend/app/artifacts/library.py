@@ -26,6 +26,8 @@ def create(type: str, title: str, *, creator: str, location: str,
         "history": [{"version": 1, "timestamp": now, "note": "created"}],
     }
     _ARTIFACTS[art["id"]] = art
+    from app.core import persistence
+    persistence.save(persistence.TABLE_ARTIFACTS, art["id"], art)
     return art
 
 

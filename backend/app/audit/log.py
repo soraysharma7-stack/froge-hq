@@ -37,7 +37,13 @@ def record(
     _LOG.append(entry)
     if len(_LOG) > _MAX:
         del _LOG[: len(_LOG) - _MAX]
+    from app.core import persistence
+    persistence.save(persistence.TABLE_AUDIT, entry["id"], entry)
     return entry
+
+
+def restore(doc: dict) -> None:
+    _LOG.append(doc)
 
 
 def query(limit: int = 200, result: str | None = None) -> list[dict]:

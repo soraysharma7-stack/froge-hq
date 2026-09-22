@@ -4,6 +4,15 @@ from __future__ import annotations
 _SCORES: dict[str, dict] = {}
 
 
+def restore(doc: dict) -> None:
+    _SCORES[doc["employee_id"]] = doc
+
+
+def _persist(r: dict) -> None:
+    from app.core import persistence
+    persistence.save(persistence.TABLE_REPUTATION, r["employee_id"], r)
+
+
 def _get(employee_id: str) -> dict:
     return _SCORES.setdefault(employee_id, {
         "employee_id": employee_id, "missions_success": 0, "missions_failed": 0,
@@ -34,6 +43,7 @@ def record_outcome(employee_id: str, *, success: bool, duration_s: float = 0.0,
     if security_problem:
         r["security_problems"] += 1
     _recompute(r)
+    _persist(r)
     return r
 
 
@@ -41,6 +51,7 @@ def add_feedback(employee_id: str, rating: float) -> dict:
     r = _get(employee_id)
     r["feedback"].append(max(-1.0, min(1.0, rating)))
     _recompute(r)
+    _persist(r)
     return r
 
 

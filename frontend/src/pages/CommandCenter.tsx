@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useHQ } from '../store'
 import { startMission } from '../services/api'
+import { Badge, StatusBadge } from '../components/ui'
 
 
 const SEV: Record<string, string> = { info: 'text-slate-300', warning: 'text-amber-300', error: 'text-red-400' }
@@ -68,8 +69,7 @@ export default function CommandCenter() {
         <div className="holo-panel p-3"><p className="holo-title">Missions</p>
           <p className="mt-1 text-sm">{missions.filter((m) => m.status === 'RUNNING').length} running · {missions.length} total</p></div>
         <div className="holo-panel p-3"><p className="holo-title">Model Gateway</p>
-          <p className={`mt-1 text-sm ${gateway?.status === 'ONLINE' ? 'text-emerald-400' : 'text-amber-400'}`}>
-            {gateway?.status ?? '…'}</p></div>
+          <div className="mt-1">{gateway?.status ? <StatusBadge state={gateway.status} /> : <Badge tone="muted">…</Badge>}</div></div>
       </section>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

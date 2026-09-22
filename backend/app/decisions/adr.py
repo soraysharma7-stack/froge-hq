@@ -27,7 +27,13 @@ def record_decision(decision: str, *, context: str, alternatives: list[str],
         "history": [],
     }
     _DECISIONS[adr["id"]] = adr
+    from app.core import persistence
+    persistence.save(persistence.TABLE_DECISIONS, adr["id"], adr)
     return adr
+
+
+def restore(doc: dict) -> None:
+    _DECISIONS[doc["id"]] = doc
 
 
 def supersede(adr_id: str, *, new_decision: str, reasoning_summary: str, owner: str) -> dict | None:
@@ -36,6 +42,8 @@ def supersede(adr_id: str, *, new_decision: str, reasoning_summary: str, owner: 
         return None
     old["status"] = "SUPERSEDED"
     old["history"].append({"version": old["version"], "superseded_at": time.time()})
+    from app.core import persistence
+    persistence.save(persistence.TABLE_DECISIONS, old["id"], old)
     new = record_decision(
         new_decision, context=old["context"], alternatives=old["alternatives"],
         reasoning_summary=reasoning_summary, evidence=old["evidence"],
