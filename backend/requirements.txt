@@ -1,0 +1,11 @@
+# FROGÉ HQ — Phase 1
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+sqlalchemy
+aiosqlite
+pytest
+pytest-asyncio
+httpx
+psutil
