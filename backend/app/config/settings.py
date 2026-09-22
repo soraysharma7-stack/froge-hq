@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     model_api_base: str = ""                # provider endpoint, from env
     model_api_key: str = ""                 # provider key, from env
 
+    # Owner sign-in (empty = open dev mode, no login required)
+    owner_email: str = ""
+    owner_password: str = ""
+    auth_secret: str = ""
+
+    # Static frontend (production: serve the Vite build from FastAPI)
+    frontend_dist: str = "../frontend/dist"
+
     # Workspace sandbox root for tool execution
     workspace_root: str = "./workspace_sandbox"
 

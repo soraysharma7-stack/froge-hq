@@ -12,6 +12,11 @@ from app.core import persistence
 app = FastAPI(title=settings.app_name, version="1.0.0")
 
 
+@app.get("/")
+def root():
+    return {"app": settings.app_name, "docs": "/docs", "api": "/api", "ws": "/ws/events"}
+
+
 @app.on_event("startup")
 async def _startup():
     await db.init_db()
@@ -33,7 +38,15 @@ app.add_middleware(
 app.include_router(api_router, prefix="/api")
 app.include_router(ws_router)
 
+# Production: serve the built frontend from the same service (one live URL).
+import os
+from fastapi.staticfiles import StaticFiles
 
-@app.get("/")
-def root():
-    return {"app": settings.app_name, "docs": "/docs", "api": "/api", "ws": "/ws/events"}
+_dist = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", settings.frontend_dist))
+if os.path.isdir(_dist):
+    app.mount("/", StaticFiles(directory=_dist, html=True), name="frontend")
+
+
+@app.get("/healthz")
+def healthz():
+    return {"app": settings.app_name, "ok": True}

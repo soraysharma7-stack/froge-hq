@@ -10,6 +10,7 @@ interface HQState {
   wsConnected: boolean
   stopAll: boolean
   mode: string
+  authed: boolean
   addEvent: (e: HQEvent) => void
   setBacklog: (e: HQEvent[]) => void
   setEmployees: (e: Employee[]) => void
@@ -19,6 +20,7 @@ interface HQState {
   setWsConnected: (v: boolean) => void
   setStopAll: (v: boolean) => void
   setMode: (v: string) => void
+  setAuthed: (v: boolean) => void
 }
 
 export const useHQ = create<HQState>((set) => ({
@@ -30,6 +32,7 @@ export const useHQ = create<HQState>((set) => ({
   wsConnected: false,
   stopAll: false,
   mode: 'ONLINE',
+  authed: true,
   addEvent: (e) => set((s) => ({ events: [...s.events.slice(-299), e] })),
   setBacklog: (events) => set({ events }),
   setEmployees: (employees) => set({ employees }),
@@ -39,4 +42,5 @@ export const useHQ = create<HQState>((set) => ({
   setWsConnected: (wsConnected) => set({ wsConnected }),
   setStopAll: (stopAll) => set({ stopAll }),
   setMode: (mode) => set({ mode }),
+  setAuthed: (authed) => set({ authed }),
 }))

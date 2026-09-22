@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: froge-hq
+    runtime: python
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build && cd ../backend && pip install -r requirements.txt
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: FROGE_OWNER_EMAIL
+        sync: false
+      - key: FROGE_OWNER_PASSWORD
+        sync: false
+      - key: FROGE_AUTH_SECRET
+        generateValue: true
+      - key: FROGE_MODEL_PROVIDER
+        value: openai-compatible
+      - key: FROGE_MODEL_NAME
+        sync: false
+      - key: FROGE_MODEL_API_BASE
+        sync: false
+      - key: FROGE_MODEL_API_KEY
+        sync: false
+      - key: FROGE_MAX_ACTIVE_AGENTS
+        value: "5"
+      - key: FROGE_MAX_BROWSER_INSTANCES
+        value: "1"

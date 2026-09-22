@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import time
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
+
+from app import auth
 
 from app.approvals import engine as approvals
 from app.artifacts import library as artifacts
@@ -32,6 +35,38 @@ from app.skills.registry import SKILLS
 from app.voice import router as voice
 
 router = APIRouter()
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+async def require_auth(creds: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> None:
+    """When owner credentials are configured, every API route needs a valid Bearer token."""
+    if not auth.auth_required():
+        return
+    if creds is None or auth.verify_token(creds.credentials) is None:
+        raise HTTPException(status_code=401, detail="UNAUTHORIZED: sign in required")
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+@router.get("/auth/config")
+def auth_config() -> dict:
+    return {"auth_required": auth.auth_required()}
+
+
+@router.post("/auth/login")
+def auth_login(body: LoginRequest) -> dict:
+    if not auth.auth_required():
+        raise HTTPException(status_code=400, detail="auth not configured (open dev mode)")
+    if not auth.verify_credentials(body.email, body.password):
+        raise HTTPException(status_code=401, detail="invalid email or password")
+    return auth.issue_token(body.email)
+
+
+router.dependencies.append(Depends(require_auth))
 _STARTED = time.time()
 
 

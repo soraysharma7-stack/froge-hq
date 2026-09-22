@@ -1,4 +1,8 @@
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { useHQ } from './store'
+import { checkAuthConfig, getToken } from './services/api'
+import Login from './pages/Login'
 import Layout from './components/Layout'
 import CommandCenter from './pages/CommandCenter'
 import Office from './pages/Office'
@@ -11,6 +15,23 @@ import MemoryVault from './pages/Memory'
 import { SkillsPage, QAPage, ModelGatewayPage, ArtifactsPage, DecisionsPage, SettingsPage } from './pages/Misc'
 
 export default function App() {
+  const authed = useHQ((s) => s.authed)
+  const setAuthed = useHQ((s) => s.setAuthed)
+  const [checking, setChecking] = useState(true)
+
+  useEffect(() => {
+    checkAuthConfig()
+      .then((required) => {
+        // If the deployment requires auth, a stored token must exist; otherwise show Login.
+        setAuthed(!required || !!getToken())
+      })
+      .catch(() => setAuthed(true)) // backend unreachable → dev mode passthrough
+      .finally(() => setChecking(false))
+  }, [setAuthed])
+
+  if (checking) return null
+  if (!authed) return <Login />
+
   return (
     <BrowserRouter>
       <Routes>

@@ -1,14 +1,60 @@
 import { useHQ } from '../store'
 import type { HQEvent } from '../types'
 
+const TOKEN_KEY = 'froge_token'
+
+export const getToken = () => localStorage.getItem(TOKEN_KEY)
+export const setToken = (t: string | null) =>
+  t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY)
+
+function headers(): Record<string, string> {
+  const h: Record<string, string> = { 'Content-Type': 'application/json' }
+  const t = getToken()
+  if (t) h.Authorization = `Bearer ${t}`
+  return h
+}
+
+async function handle(r: Response) {
+  if (r.status === 401) {
+    setToken(null)
+    useHQ.getState().setAuthed(false)
+    throw new Error('unauthorized')
+  }
+  return r.json()
+}
+
 export const api = {
-  get: (path: string) => fetch(`/api${path}`).then((r) => r.json()),
+  get: (path: string) => fetch(`/api${path}`, { headers: headers() }).then(handle),
   post: (path: string, body?: unknown) =>
     fetch(`/api${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers(),
       body: body === undefined ? undefined : JSON.stringify(body),
-    }).then((r) => r.json()),
+    }).then(handle),
+}
+
+export async function checkAuthConfig(): Promise<boolean> {
+  const r = await fetch('/api/auth/config')
+  const cfg = await r.json()
+  return !!cfg.auth_required
+}
+
+export async function login(email: string, password: string): Promise<boolean> {
+  const r = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  })
+  if (!r.ok) return false
+  const data = await r.json()
+  setToken(data.access_token)
+  useHQ.getState().setAuthed(true)
+  return true
+}
+
+export function logout() {
+  setToken(null)
+  useHQ.getState().setAuthed(false)
 }
 
 export async function refreshState() {
