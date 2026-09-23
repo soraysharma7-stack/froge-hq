@@ -12,6 +12,7 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { DataStreamLog } from "@/components/DataStreamLog";
 import { LoginGate } from "@/components/LoginGate";
 import { StatsChart } from "@/components/StatsChart";
+import { TelemetryStrip } from "@/components/TelemetryStrip";
 import { TopBar } from "@/components/TopBar";
 import { VisualOffice } from "@/components/VisualOffice";
 import { GlowButton, TextInput } from "@/components/ui/panel";
@@ -190,6 +191,8 @@ export default function DashboardPage() {
         onStopAll={stopAll}
         onRelease={releaseStop}
       />
+
+      <TelemetryStrip />
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[1.6fr_1fr]">
         {/* Left column: visual office + approvals */}
