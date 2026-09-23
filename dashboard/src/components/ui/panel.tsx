@@ -17,12 +17,20 @@ export function Panel({
   return (
     <section
       className={cn(
-        "flex min-h-0 flex-col rounded-[10px] border border-accent-dim bg-panel shadow-glow",
+        "relative flex min-h-0 flex-col rounded-[10px] border border-accent-dim bg-panel shadow-glow",
         className,
       )}
     >
+      {/* command-center corner ticks */}
+      <span aria-hidden className="pointer-events-none absolute left-0 top-0 h-2.5 w-2.5 border-l-2 border-t-2 border-accent" />
+      <span aria-hidden className="pointer-events-none absolute right-0 top-0 h-2.5 w-2.5 border-r-2 border-t-2 border-accent" />
+      <span aria-hidden className="pointer-events-none absolute bottom-0 left-0 h-2.5 w-2.5 border-b-2 border-l-2 border-accent" />
+      <span aria-hidden className="pointer-events-none absolute bottom-0 right-0 h-2.5 w-2.5 border-b-2 border-r-2 border-accent" />
       <header className="flex items-center justify-between gap-2 border-b border-accent-dim px-3 py-2">
-        <h2 className="font-mono text-[11px] uppercase tracking-[0.2em] text-accent">{title}</h2>
+        <h2 className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.2em] text-accent">
+          <span className="inline-block h-1 w-1 animate-pulse-dot rounded-full bg-accent" />
+          {title}
+        </h2>
         {right}
       </header>
       <div className={cn("min-h-0 flex-1 overflow-auto p-3", bodyClassName)}>{children}</div>
