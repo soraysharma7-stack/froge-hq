@@ -89,6 +89,13 @@ def seed_defaults() -> None:
         skills=["filesystem_verify"], tools=["workspace_file_verifier"], security_level=2,
     ))
     register(Employee(
+        id="nova", name="Nova", department="research",
+        role="Research Analyst",
+        personality="curious, source-driven",
+        capabilities=["web_research", "fact_gathering"],
+        skills=["web_search"], tools=["web_search"], security_level=2,
+    ))
+    register(Employee(
         id="rex", name="Rex", department="security",
         role="Security Lead",
         personality="cautious, rule-bound",
