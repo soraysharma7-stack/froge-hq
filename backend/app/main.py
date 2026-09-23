@@ -12,6 +12,30 @@ from app.core import persistence
 app = FastAPI(title=settings.app_name, version="1.0.0")
 
 
+@app.middleware("http")
+async def security_headers(request, call_next):
+    """Deterministic security headers on every response. Backend-enforced."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "0"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    # HSTS only meaningful over HTTPS (Render terminates TLS); safe to always send.
+    response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+    if request.url.path == "/" or request.url.path.endswith(".html"):
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "font-src 'self'; "
+            "connect-src 'self' wss: https:; "
+            "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        )
+    return response
+
+
 @app.get("/healthz")
 def healthz():
     return {"app": settings.app_name, "ok": True}
@@ -28,11 +52,15 @@ async def _startup():
 async def _shutdown():
     await db.close_db()
 
+_cors_origins = (
+    [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+    if getattr(settings, "cors_origins", "") else ["*"]
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_cors_origins,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(api_router, prefix="/api")
