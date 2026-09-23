@@ -13,6 +13,21 @@ body {
   color: #d4d4d8;
 }
 
+body {
+  /* subtle blueprint grid texture behind the panels */
+  background-image:
+    linear-gradient(rgba(45, 212, 191, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45, 212, 191, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* smooth, non-janky scrolling inside panels */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(45, 212, 191, 0.3) transparent;
+}
 *::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -26,4 +41,23 @@ body {
 }
 *::-webkit-scrollbar-thumb:hover {
   background: rgba(45, 212, 191, 0.45);
+}
+
+/* visible, on-brand focus ring for keyboard users (a11y) */
+:focus-visible {
+  outline: 2px solid rgba(45, 212, 191, 0.7);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* respect users who prefer less motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
