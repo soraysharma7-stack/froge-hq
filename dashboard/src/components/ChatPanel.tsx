@@ -5,6 +5,7 @@ import { SendHorizonal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "@/lib/types";
 import { GlowButton, Panel, TextInput } from "./ui/panel";
+import { VoiceMic } from "./VoiceMic";
 
 function ThinkingDots() {
   return (
@@ -107,6 +108,7 @@ export function ChatPanel({
           placeholder="Type a command for Maya…"
           className="flex-1"
         />
+        <VoiceMic onTranscript={(text) => setDraft(text)} />
         <GlowButton onClick={submit} aria-label="Send message">
           <SendHorizonal className="h-4 w-4" />
         </GlowButton>
