@@ -54,7 +54,25 @@ class LoginRequest(BaseModel):
 
 @router.get("/auth/config")
 def auth_config() -> dict:
-    return {"auth_required": auth.auth_required()}
+    return {"auth_required": auth.auth_required(), "signup_enabled": True}
+
+
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+    name: str = ""
+
+
+@router.post("/auth/signup", status_code=201)
+def auth_signup(body: SignupRequest) -> dict:
+    if not auth.auth_required():
+        raise HTTPException(status_code=400, detail="auth not configured (open dev mode)")
+    try:
+        account = auth.create_account(body.email, body.password, body.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    token = auth.issue_token(account["email"])
+    return {**token, "account": account}
 
 
 @router.post("/auth/login")
