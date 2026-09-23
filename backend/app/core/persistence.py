@@ -98,4 +98,10 @@ async def restore_all() -> None:
         knowledge.restore(doc)
     restored["knowledge"] = len(await db.load_all(TABLE_KNOWLEDGE))
 
+    from app import auth
+    account_docs = await db.load_all(auth.TABLE_ACCOUNTS)
+    for doc in account_docs:
+        auth.restore_account(doc)
+    restored["accounts"] = len(account_docs)
+
     log.info("persistence restored: %s", restored)
