@@ -18,6 +18,7 @@ from app.tools.workspace_tools import ToolPermissionError
 _TOOL_RISK: dict[str, policy.Risk] = {
     "workspace_file_write": policy.Risk.MEDIUM,
     "workspace_file_verify": policy.Risk.LOW,
+    "web_search": policy.Risk.LOW,
 }
 
 
@@ -101,7 +102,10 @@ async def execute_step(step: dict[str, Any], *, mission_id: str, args: dict[str,
     await bus.publish(EventType.TOOL_STARTED, f"Tool started: {tool_id}",
                       source=employee_id, mission_id=mission_id, employee_id=employee_id)
     try:
-        result = skill.execute(**args)
+        if skill_id == "web_search":
+            result = skill.execute(query=args["query"], max_results=args.get("max_results", 5))
+        else:
+            result = skill.execute(**args)
         status = "SUCCESS"
         error = None
     except ToolPermissionError as e:
