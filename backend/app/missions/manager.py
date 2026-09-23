@@ -2,6 +2,7 @@
 
 USER → MAYA → MISSION → EMPLOYEE → SKILL → REAL TOOL → WS EVENTS → QA → RESULT → MEMORY/ARTIFACT/AUDIT
 Simulation mode, mission replay, time-machine snapshots, STOP ALL, reputation, cost.
+Execution runs through the Agent Brain loop (app/brain/).
 """
 from __future__ import annotations
 
@@ -23,6 +24,7 @@ from app.reputation import tracker as reputation
 from app.resources import governor
 from app.skills.registry import SKILLS
 from app.tools.workspace_tools import ToolPermissionError, workspace_file_verify
+from app.brain import loop as brain_loop
 
 
 class MissionStatus(str, Enum):
@@ -205,7 +207,7 @@ async def run_mission(title: str, objective: str, *, simulate: bool = False) -> 
     sam = employees.get("sam")
 
     try:
-        # 1. MAYA PLANS
+        # 1. MAYA PLANS (brain loop: understand → context → plan)
         mission.status = MissionStatus.PLANNING
         mission.touch()
         mission.log("MAYA_PLANNED", "planning started")
@@ -220,18 +222,20 @@ async def run_mission(title: str, objective: str, *, simulate: bool = False) -> 
                           employee_id="maya", department="orchestration",
                           duration_ms=model_resp.latency_ms, tokens=model_resp.usage)
 
-        mission.plan = [
-            {"step": 1, "owner": "maya", "action": "plan", "status": "done"},
-            {"step": 2, "owner": "alex", "action": "filesystem_write",
-             "target": f"missions/{mission.id}/report.md", "status": "pending"},
-            {"step": 3, "owner": "sam", "action": "filesystem_verify",
-             "target": f"missions/{mission.id}/report.md", "status": "pending"},
-        ]
-        await bus.publish(EventType.PLAN_CREATED, f"Maya planned 3 steps for: {title}",
-                          source="maya", mission_id=mission.id,
-                          metadata={"model_status": "error" if model_resp.error else "ok"})
-        mission.log("MAYA_PLANNED", "3 steps")
+        def _content_builder(task: dict) -> tuple[str, str]:
+            path = f"missions/{mission.id}/report.md"
+            body = (
+                f"# Mission Report — {mission.title}\n\n"
+                f"- Mission ID: {mission.id}\n- Objective: {mission.objective}\n"
+                f"- Task type: {task['task_type']} ({task['complexity']})\n"
+                f"- Requester: {mission.requester}\n- Orchestrated by: Maya\n"
+                f"- Executed via: Agent Brain loop (validated skills + tools)\n"
+                f"- Status: EXECUTED (real tool execution, workspace sandbox)\n"
+            )
+            return path, body
 
+        # 2–5. BRAIN LOOP executes: permission → skill/tool validate → execute →
+        # observe → verify → bounded recovery → escalate. Backend owns every step.
         if simulate:
             mission.status = MissionStatus.COMPLETED
             mission.completed_at = time.time()
@@ -242,10 +246,28 @@ async def run_mission(title: str, objective: str, *, simulate: bool = False) -> 
                 maya.state = EmployeeState.AVAILABLE
             return mission
 
-        # 2. ALEX EXECUTES (real tool, sandboxed) — resource-governed
-        active_count = sum(1 for e in employees.all_employees() if e.state == EmployeeState.ACTIVE)
-        if not governor.can_activate(active_count):
-            await governor.enqueue({"mission_id": mission.id, "title": title})
+        mission.status = MissionStatus.RUNNING
+        mission.touch()
+        result = await brain_loop.run_brain_loop(
+            mission_id=mission.id, objective=objective, title=title,
+            content_builder=_content_builder,
+            stop_check=governor.stop_all_engaged)
+
+        mission.plan = result.get("plan", [])
+        mission.outputs["brain"] = {
+            "task": result.get("task"), "team": result.get("team"),
+            "confidence": result.get("confidence"),
+            "observations": [
+                {"status": o.get("status"), "summary": o.get("summary"),
+                 "tool": o.get("record", {}).get("tool_id")}
+                for o in result.get("observations", [])
+            ],
+            "supervision": result.get("supervision", []),
+            "agent_message": result.get("agent_message"),
+            "escalated": result.get("escalated", False),
+        }
+
+        if result.get("stage") == "queued":
             mission.status = MissionStatus.PAUSED
             mission.errors.append("Resource limit — queued")
             mission.log("QUEUED", "resource limit")
@@ -253,81 +275,41 @@ async def run_mission(title: str, objective: str, *, simulate: bool = False) -> 
             if maya:
                 maya.state = EmployeeState.AVAILABLE
             return mission
+        if result.get("stage") == "plan_validation":
+            raise RuntimeError("Plan failed validation: " + "; ".join(result.get("errors", [])))
 
-        mission.status = MissionStatus.RUNNING
-        mission.current_step = 2
-        mission.touch()
-        if maya:
-            maya.state = EmployeeState.WAITING
-        if alex:
-            alex.state = EmployeeState.ACTIVE
-        mission.active_employees = ["alex"]
-        _snapshot()
-        await bus.publish(EventType.AGENT_ACTIVATED, "Alex activated (Software Engineer)",
-                          source="maya", mission_id=mission.id, employee_id="alex")
-        mission.log("EMPLOYEE_ACTIVATED", "alex")
+        for obs in result.get("observations", []):
+            rec = obs.get("record", {})
+            emp = rec.get("employee_id")
+            if emp and emp != "maya":
+                mission.log("EMPLOYEE_ACTIVATED", emp)
+            if rec.get("tool_id") and obs.get("status") == "SUCCESS":
+                res = obs.get("result") or {}
+                mission.log("TOOL_EXECUTED", res.get("path", rec["tool_id"]))
 
-        write_skill = SKILLS["filesystem_write"]
-        report_content = (
-            f"# Mission Report — {mission.title}\n\n"
-            f"- Mission ID: {mission.id}\n- Objective: {mission.objective}\n"
-            f"- Requester: {mission.requester}\n- Orchestrated by: Maya\n"
-            f"- Executed by: Alex (filesystem_write skill)\n"
-            f"- Status: EXECUTED (real tool execution, workspace sandbox)\n"
-        )
-        await bus.publish(EventType.SKILL_STARTED, "Skill started: filesystem_write",
-                          source="alex", mission_id=mission.id, employee_id="alex")
-        await bus.publish(EventType.TOOL_STARTED, "Tool started: workspace_file_write",
-                          source="alex", mission_id=mission.id, employee_id="alex")
-        mission.log("SKILL_STARTED", "filesystem_write")
-        result = write_skill.execute(relative_path=f"missions/{mission.id}/report.md",
-                                     content=report_content)
-        audit.record("alex", "tool:workspace_file_write", mission_id=mission.id,
-                     employee_id="alex", tool="workspace_file_write",
-                     permission="workspace:write", result="ok", metadata=result)
-        await bus.publish(EventType.TOOL_COMPLETED, f"File written: {result['bytes']} bytes",
-                          source="alex", mission_id=mission.id, employee_id="alex",
-                          metadata=result)
-        await bus.publish(EventType.SKILL_COMPLETED, "Skill completed: filesystem_write",
-                          source="alex", mission_id=mission.id, employee_id="alex")
-        mission.log("TOOL_EXECUTED", result["path"])
-        mission.outputs["artifact"] = result
-        mission.plan[1]["status"] = "done"
-        if alex:
-            alex.state = EmployeeState.SUCCESS
+        artifact_obs = next(
+            (o for o in result.get("observations", []) if o.get("result", {}) and "path" in (o.get("result") or {})),
+            None)
+        if artifact_obs:
+            mission.outputs["artifact"] = artifact_obs["result"]
+        mission.outputs["qa_evidence"] = {
+            "verified": result.get("verified", False),
+            "path": result.get("artifact_path"),
+        }
 
-        # 3. SAM VERIFIES (QA evidence)
-        if sam:
-            sam.state = EmployeeState.ACTIVE
-        mission.active_employees = ["sam"]
-        mission.current_step = 3
-        await bus.publish(EventType.QA_STARTED, "QA verification started by Sam",
-                          source="sam", mission_id=mission.id, employee_id="sam")
-        verify_skill = SKILLS["filesystem_verify"]
-        evidence = verify_skill.execute(relative_path=f"missions/{mission.id}/report.md")
-        audit.record("sam", "qa:filesystem_verify", mission_id=mission.id,
-                     employee_id="sam", tool="workspace_file_verify",
-                     permission="workspace:read",
-                     result="ok" if evidence["verified"] else "failed", metadata=evidence)
-        mission.outputs["qa_evidence"] = evidence
-        mission.plan[2]["status"] = "done" if evidence["verified"] else "failed"
-        if sam:
-            sam.state = EmployeeState.SUCCESS if evidence["verified"] else EmployeeState.FAILED
+        if not result.get("ok"):
+            raise RuntimeError("; ".join(result.get("errors", ["mission incomplete"])))
+        mission.log("QA_VERIFIED", result.get("artifact_path", ""))
 
-        if not evidence["verified"]:
-            await bus.publish(EventType.QA_FAILURE, "QA could not verify artifact",
-                              source="sam", severity="error", mission_id=mission.id,
-                              employee_id="sam")
-            raise RuntimeError("QA verification failed — artifact missing")
-        mission.log("QA_VERIFIED", f"{evidence['bytes']} bytes")
-
-        # 4. COMPLETE — artifact, memory, reputation, cost
+        # 6. COMPLETE — artifact, memory, reputation, cost
         mission.status = MissionStatus.COMPLETED
         mission.completed_at = time.time()
-        mission.confidence = 1.0
+        mission.confidence = {"HIGH": 1.0, "MEDIUM": 0.66, "LOW": 0.33}.get(
+            result.get("confidence", "LOW"), 0.33)
         mission.final_summary = (
-            f"Mission completed. Artifact verified at {evidence['path']} "
-            f"({evidence['bytes']} bytes). All steps executed for real."
+            f"Mission completed via Agent Brain. Artifact verified at "
+            f"{result.get('artifact_path')}. Confidence: {result.get('confidence')}. "
+            f"Team: {', '.join(result.get('team', []))}."
         )
         mission.log("MISSION_COMPLETED", mission.final_summary)
         mission.touch()
@@ -336,10 +318,7 @@ async def run_mission(title: str, objective: str, *, simulate: bool = False) -> 
             maya.state = EmployeeState.AVAILABLE
 
         artifacts.create("REPORT", f"Mission Report — {title}", creator="alex",
-                         location=result["path"], mission_id=mission.id)
-        vault.store(f"Mission '{title}' completed successfully with verified artifact.",
-                    category=vault.Category.SUCCESSES, source="maya",
-                    mission_id=mission.id, confidence=0.9)
+                         location=result.get("artifact_path", ""), mission_id=mission.id)
         duration = mission.completed_at - started
         reputation.record_outcome("alex", success=True, duration_s=duration)
         reputation.record_outcome("sam", success=True, duration_s=0.1)
