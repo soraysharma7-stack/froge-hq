@@ -12,9 +12,9 @@ from app.core import persistence
 app = FastAPI(title=settings.app_name, version="1.0.0")
 
 
-@app.get("/")
-def root():
-    return {"app": settings.app_name, "docs": "/docs", "api": "/api", "ws": "/ws/events"}
+@app.get("/healthz")
+def healthz():
+    return {"app": settings.app_name, "ok": True}
 
 
 @app.on_event("startup")
@@ -30,7 +30,7 @@ async def _shutdown():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Phase 1 dev; tighten later
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -42,11 +42,6 @@ app.include_router(ws_router)
 import os
 from fastapi.staticfiles import StaticFiles
 
-_dist = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", settings.frontend_dist))
+_dist = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", settings.frontend_dist.lstrip("./")))
 if os.path.isdir(_dist):
     app.mount("/", StaticFiles(directory=_dist, html=True), name="frontend")
-
-
-@app.get("/healthz")
-def healthz():
-    return {"app": settings.app_name, "ok": True}
