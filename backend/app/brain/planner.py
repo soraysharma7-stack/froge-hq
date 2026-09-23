@@ -16,6 +16,14 @@ _TASK_STEP_TEMPLATES: dict[str, list[dict[str, Any]]] = {
         {"action": "filesystem_verify", "owner": "sam", "skill": "filesystem_verify",
          "tool": "workspace_file_verify", "permission": "workspace:read"},
     ],
+    "research": [
+        {"action": "web_search", "owner": "nova", "skill": "web_search",
+         "tool": "web_search", "permission": "web:search"},
+        {"action": "filesystem_write", "owner": "alex", "skill": "filesystem_write",
+         "tool": "workspace_file_write", "permission": "workspace:write"},
+        {"action": "filesystem_verify", "owner": "sam", "skill": "filesystem_verify",
+         "tool": "workspace_file_verify", "permission": "workspace:read"},
+    ],
     "verification": [
         {"action": "filesystem_verify", "owner": "sam", "skill": "filesystem_verify",
          "tool": "workspace_file_verify", "permission": "workspace:read"},
@@ -35,6 +43,15 @@ _TASK_STEP_TEMPLATES: dict[str, list[dict[str, Any]]] = {
 }
 
 
+_RESEARCH_HINTS = ("research", "search", "look up", "find out", "latest", "news",
+                    "current", "who is", "what is", "web")
+
+
+def is_research(objective: str) -> bool:
+    text = objective.lower()
+    return any(h in text for h in _RESEARCH_HINTS)
+
+
 def smallest_capable_team(task: dict[str, Any]) -> list[str]:
     """Pick the minimal set of employees for the task. Never activate unnecessary agents."""
     team = ["maya"]
@@ -45,7 +62,8 @@ def smallest_capable_team(task: dict[str, Any]) -> list[str]:
     return team
 
 
-def build_plan(task: dict[str, Any], mission_id: str, target_path: str) -> list[dict[str, Any]]:
+def build_plan(task: dict[str, Any], mission_id: str, target_path: str,
+               research_query: str | None = None) -> list[dict[str, Any]]:
     """Structured plan with validated steps. Each step: id/objective/employee/skill/tool/
     dependencies/permission/status."""
     steps: list[dict[str, Any]] = [
@@ -64,20 +82,22 @@ def build_plan(task: dict[str, Any], mission_id: str, target_path: str) -> list[
     template = _TASK_STEP_TEMPLATES.get(task["task_type"], _TASK_STEP_TEMPLATES["general"])
     prev_id = 1
     for i, t in enumerate(template, start=2):
-        steps.append(
-            {
-                "step_id": i,
-                "objective": f"{t['action']} on {target_path}",
-                "action": t["action"],
-                "employee": t["owner"],
-                "skill": t["skill"],
-                "tool": t["tool"],
-                "target": target_path,
-                "dependencies": [prev_id],
-                "permission": t["permission"],
-                "status": "pending",
-            }
-        )
+        step: dict[str, Any] = {
+            "step_id": i,
+            "objective": (f"web search: {research_query}" if t["skill"] == "web_search"
+                          else f"{t['action']} on {target_path}"),
+            "action": t["action"],
+            "employee": t["owner"],
+            "skill": t["skill"],
+            "tool": t["tool"],
+            "target": target_path,
+            "dependencies": [prev_id],
+            "permission": t["permission"],
+            "status": "pending",
+        }
+        if t["skill"] == "web_search" and research_query:
+            step["query"] = research_query
+        steps.append(step)
         prev_id = i
     return steps
 
