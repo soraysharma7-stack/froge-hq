@@ -52,6 +52,26 @@ export async function login(email: string, password: string): Promise<boolean> {
   return true
 }
 
+export async function signup(
+  email: string,
+  password: string,
+  name: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const r = await fetch('/api/auth/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, name }),
+  })
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    return { ok: false, error: data.detail || 'Signup failed.' }
+  }
+  const data = await r.json()
+  setToken(data.access_token)
+  useHQ.getState().setAuthed(true)
+  return { ok: true }
+}
+
 export function logout() {
   setToken(null)
   useHQ.getState().setAuthed(false)
