@@ -14,8 +14,8 @@ const config: Config = {
         maya: "#f59e0b",
       },
       fontFamily: {
-        mono: ["'JetBrains Mono'", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
-        sans: ["'Inter'", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
       },
       boxShadow: {
         glow: "0 0 12px rgba(45, 212, 191, 0.25)",
