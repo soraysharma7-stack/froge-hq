@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
@@ -47,6 +47,25 @@ async def require_auth(creds: HTTPAuthorizationCredentials | None = Depends(_bea
         raise HTTPException(status_code=401, detail="UNAUTHORIZED: sign in required")
 
 
+# ---- Auth brute-force rate limiting (per client IP, sliding window) ----
+_auth_attempts: dict[str, list[float]] = {}
+
+
+def _rate_limit(request: Request) -> None:
+    """Block after N failed/attempted auth calls per IP per window. Deterministic."""
+    limit = getattr(settings, "auth_rate_limit", 10)
+    window = getattr(settings, "auth_rate_window_s", 300)
+    ip = (request.client.host if request.client else "unknown")
+    now = time.time()
+    attempts = [t for t in _auth_attempts.get(ip, []) if now - t < window]
+    if len(attempts) >= limit:
+        audit.record("security", "auth_rate_limited", result="denied",
+                     metadata={"ip": ip, "limit": limit})
+        raise HTTPException(status_code=429, detail="too many attempts — try again later")
+    attempts.append(now)
+    _auth_attempts[ip] = attempts
+
+
 class LoginRequest(BaseModel):
     email: str
     password: str
@@ -64,9 +83,10 @@ class SignupRequest(BaseModel):
 
 
 @router.post("/auth/signup", status_code=201)
-def auth_signup(body: SignupRequest) -> dict:
+def auth_signup(body: SignupRequest, request: Request) -> dict:
     if not auth.auth_required():
         raise HTTPException(status_code=400, detail="auth not configured (open dev mode)")
+    _rate_limit(request)
     try:
         account = auth.create_account(body.email, body.password, body.name)
     except ValueError as exc:
@@ -76,9 +96,10 @@ def auth_signup(body: SignupRequest) -> dict:
 
 
 @router.post("/auth/login")
-def auth_login(body: LoginRequest) -> dict:
+def auth_login(body: LoginRequest, request: Request) -> dict:
     if not auth.auth_required():
         raise HTTPException(status_code=400, detail="auth not configured (open dev mode)")
+    _rate_limit(request)
     if not auth.verify_credentials(body.email, body.password):
         raise HTTPException(status_code=401, detail="invalid email or password")
     return auth.issue_token(body.email)
