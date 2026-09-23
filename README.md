@@ -7,7 +7,9 @@
 
 **Live web app: https://froge-hq.onrender.com**
 
-Virtual AI organization HQ — open source (MIT). Maya is the Chief AI Orchestrator; a team of AI employees runs missions under a deterministic security policy, with you as final authority.
+**Best free AI agents platform & visual AI company — open source (MIT).** Maya is the Chief AI Orchestrator; a team of AI employees runs missions in a live visual office under a deterministic security policy, with you as final authority.
+
+Keywords: best free AI agents · free AI agent platform · visual AI company · multi-agent orchestration · AI workforce
 
 ## Run it — pick your device
 
