@@ -32,6 +32,14 @@ class Settings(BaseSettings):
     # Workspace sandbox root for tool execution
     workspace_root: str = "./workspace_sandbox"
 
+    # CORS — comma-separated allowed origins. Empty = permissive dev ("*").
+    # Production: set to your live URL, e.g. "https://froge-hq.onrender.com"
+    cors_origins: str = ""
+
+    # Auth rate limiting (login/signup attempts per IP per window)
+    auth_rate_limit: int = 10          # max attempts
+    auth_rate_window_s: int = 300      # per 5-minute window
+
     class Config:
         env_prefix = "FROGE_"
         env_file = ".env"
