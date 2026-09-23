@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://froge-hq.onrender.com/sitemap.xml
