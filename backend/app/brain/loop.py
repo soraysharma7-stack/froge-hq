@@ -2,6 +2,7 @@
 EXECUTE → OBSERVE → VERIFY → CONTINUE/CORRECT/ESCALATE → FINAL RESULT.
 
 Maya supervises: who/what/why/current step/tool/status/result/next action.
+Emits structured decision summaries (no chain-of-thought) for every phase.
 """
 from __future__ import annotations
 
@@ -43,6 +44,20 @@ async def run_brain_loop(*, mission_id: str, objective: str, title: str,
             "at": time.time(),
         })
 
+    # Decision summary — structured, observable, no chain-of-thought.
+    decision_log: list[dict[str, Any]] = []
+
+    async def decide(stage: str, decision: str, reason: str,
+                     confidence: str = "HIGH") -> None:
+        entry = {"stage": stage, "decision": decision, "reason": reason,
+                 "confidence": confidence, "at": time.time()}
+        decision_log.append(entry)
+        await bus.publish("DECISION_SUMMARY",
+                          f"[{stage}] {decision}",
+                          source="maya", mission_id=mission_id,
+                          metadata={"stage": stage, "decision": decision,
+                                    "reason": reason, "confidence": confidence})
+
     # 1. UNDERSTAND
     task = understand.understand(objective)
     await bus.publish(EventType.SYSTEM,
@@ -51,16 +66,25 @@ async def run_brain_loop(*, mission_id: str, objective: str, title: str,
                       metadata={"task": task})
     supervise("maya", "understand objective", "structured task model", "UNDERSTAND",
               None, "done", task["task_type"], "collect context")
+    await decide("UNDERSTAND",
+                 f"Task is {task['task_type']} ({task['complexity']})",
+                 f"requires_tools={task['requires_tools']}, verification={task['requires_verification']}")
 
     # 2. CONTEXT — relevance-filtered
     ctx = context_mod.collect(objective)
     supervise("maya", "collect context", "relevance-filtered retrieval", "CONTEXT",
               None, "done", f"{len(ctx['relevant_memories'])} memories", "plan")
 
+    # Research upgrade: if the objective needs the live web, use the research plan.
+    research = planner.is_research(objective)
+    if research:
+        task["task_type"] = "research"
+
     # 3. PLAN — smallest capable team, validated
     team = planner.smallest_capable_team(task)
     relative_path, content = content_builder(task)
-    plan = planner.build_plan(task, mission_id, relative_path)
+    plan = planner.build_plan(task, mission_id, relative_path,
+                              research_query=objective if research else None)
     problems = planner.validate_plan(plan)
     if problems:
         return BrainResult(ok=False, stage="plan_validation", errors=problems,
@@ -71,6 +95,9 @@ async def run_brain_loop(*, mission_id: str, objective: str, title: str,
                       metadata={"plan_steps": len(plan), "team": team})
     supervise("maya", "plan mission", f"{len(plan)} validated steps", "PLAN",
               None, "done", "plan valid", "check resources")
+    await decide("PLAN",
+                 f"{len(plan)} steps, team={', '.join(team)}",
+                 "smallest capable team; every step validated against registries")
 
     # 4. RESOURCE CHECK — backend-enforced 5-agent hard limit
     active_count = sum(1 for e in employees.all_employees() if e.state == EmployeeState.ACTIVE)
@@ -110,6 +137,8 @@ async def run_brain_loop(*, mission_id: str, objective: str, title: str,
         elif step["skill"] == "filesystem_verify":
             args = {"relative_path": relative_path}
             _set_state(emp_id, EmployeeState.WAITING)
+        elif step["skill"] == "web_search":
+            args = {"query": step.get("query", objective), "max_results": 5}
 
         obs = await execute_step_with_recovery(step, mission_id=mission_id, args=args,
                                                stop_check=stop_check)
@@ -123,6 +152,17 @@ async def run_brain_loop(*, mission_id: str, objective: str, title: str,
                           step.get("tool"), "done",
                           f"verified={verified}", "report to maya")
                 _set_state(emp_id, EmployeeState.SUCCESS if verified else EmployeeState.FAILED)
+                await decide("VERIFY",
+                             f"Artifact {'verified' if verified else 'NOT verified'}",
+                             f"{result.get('bytes', '?')} bytes present in sandbox")
+            elif step["skill"] == "web_search":
+                supervise(emp_id, step["objective"], "live web data", "EXECUTE",
+                          step.get("tool"), "done", f"{result.get('count', 0)} results",
+                          "synthesize")
+                _set_state(emp_id, EmployeeState.SUCCESS)
+                await decide("RESEARCH",
+                             f"Web search returned {result.get('count', 0)} results",
+                             f"query='{step.get('query', '')[:60]}'")
             else:
                 supervise(emp_id, step["objective"], "real artifact", "EXECUTE",
                           step.get("tool"), "done", f"{result.get('bytes', '?')} bytes",
@@ -144,6 +184,10 @@ async def run_brain_loop(*, mission_id: str, objective: str, title: str,
     grade = confidence_mod.grade(
         tool_ok=executed_ok, verified=verified, has_errors=bool(errors),
         memory_support=len(ctx["relevant_memories"]))
+    await decide("COMPLETE" if executed_ok else "BLOCKED",
+                 f"Mission {'completed' if executed_ok else 'incomplete'} — confidence {grade}",
+                 "; ".join(errors) if errors else "all steps executed and verified",
+                 confidence=grade)
 
     # 7. AGENT COMMUNICATION — structured result message back to Maya
     msg = agent_message(
@@ -170,5 +214,5 @@ async def run_brain_loop(*, mission_id: str, objective: str, title: str,
         plan=plan, task=task, team=team, observations=observations,
         verified=verified, errors=errors, escalated=escalation,
         confidence=grade, agent_message=msg, supervision=supervision,
-        artifact_path=relative_path,
+        artifact_path=relative_path, decision_log=decision_log, research=research,
     )
