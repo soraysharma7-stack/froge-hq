@@ -5,10 +5,6 @@ Every provider is configured ONLY via environment variables:
     FROGE_MODEL_NAME       e.g. a model name supplied by config
     FROGE_MODEL_API_BASE   endpoint URL (for OpenAI-compatible / local endpoints)
     FROGE_MODEL_API_KEY    provider key, from env — never hard-coded
-
-Nothing here invents a model name or falls back silently. If configuration is
-missing, the gateway reports UNCONFIGURED. If the provider call fails, it
-reports DEGRADED with the real error.
 """
 from __future__ import annotations
 
@@ -23,14 +19,11 @@ class ProviderError(Exception):
     """Raised when a configured provider call fails. Message is the real error."""
 
 
-async def complete_openai_compatible(prompt: str, max_tokens: int = 1024) -> dict:
-    """Call an OpenAI-compatible chat-completions endpoint.
-
-    Works for OpenAI itself and any compatible endpoint (local or hosted) —
-    the endpoint comes from FROGE_MODEL_API_BASE, the key from
-    FROGE_MODEL_API_KEY. No model is chosen here; settings.model_name wins.
-    """
-    if not settings.model_name:
+async def complete_openai_compatible(prompt: str, max_tokens: int = 1024,
+                                     model: str | None = None) -> dict:
+    """Call an OpenAI-compatible chat-completions endpoint."""
+    chosen = model or settings.model_name
+    if not chosen:
         raise ProviderError("MODEL_UNAVAILABLE: FROGE_MODEL_NAME is not set.")
     if not settings.model_api_base:
         raise ProviderError("MODEL_UNAVAILABLE: FROGE_MODEL_API_BASE is not set.")
@@ -39,7 +32,7 @@ async def complete_openai_compatible(prompt: str, max_tokens: int = 1024) -> dic
     url = base if base.endswith("/chat/completions") else f"{base}/chat/completions"
 
     payload = {
-        "model": settings.model_name,
+        "model": chosen,
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
     }
@@ -63,22 +56,16 @@ async def complete_openai_compatible(prompt: str, max_tokens: int = 1024) -> dic
         text = (choice.get("message") or {}).get("content", "")
         return {"text": text, "usage": data.get("usage")}
 
-    # Run the blocking HTTP call off the event loop.
     import asyncio
-
     return await asyncio.to_thread(_call)
 
 
-async def provider_complete(prompt: str, max_tokens: int = 1024) -> dict:
-    """Dispatch to the adapter for the configured provider.
-
-    Currently supported providers (all config-driven):
-      - "openai" / "openai-compatible" / "arena" / "local" → OpenAI-compatible endpoint
-    Unknown providers raise a clear error instead of silently guessing.
-    """
+async def provider_complete(prompt: str, max_tokens: int = 1024,
+                            model: str | None = None) -> dict:
+    """Dispatch to the adapter for the configured provider."""
     provider = (settings.model_provider or "").lower()
     if provider in {"openai", "openai-compatible", "arena", "local", "ollama", "openrouter"}:
-        return await complete_openai_compatible(prompt, max_tokens=max_tokens)
+        return await complete_openai_compatible(prompt, max_tokens=max_tokens, model=model)
     raise ProviderError(
         f"PROVIDER_UNSUPPORTED: '{settings.model_provider}' has no adapter. "
         "Supported: openai, openai-compatible, arena, local, ollama, openrouter "
