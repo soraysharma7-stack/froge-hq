@@ -1,10 +1,11 @@
-"""FROGÉ MODEL GATEWAY — clean abstraction over the configured Arena AI Agent model/provider.
+"""FROGÉ MODEL GATEWAY — clean abstraction over the configured model/provider.
 
 Rules (per spec):
 - The model/provider comes ONLY from configuration (settings / environment).
-- No model name is ever hard-coded.
-- No silent fallback model. If the configured model is unavailable, we report
-  a clear DEGRADED/error state.
+- No model name is ever hard-coded or invented by the backend.
+- Optional FROGE_MODEL_FALLBACKS provides an ordered list of alternates; the
+  gateway tries the configured model first, then each fallback, and reports
+  which model actually answered. Only configured models are ever used.
 """
 from __future__ import annotations
 
@@ -55,8 +56,6 @@ class ModelGateway:
         if not settings.model_name or not settings.model_api_base:
             self.status = GatewayStatus.UNCONFIGURED
         else:
-            # Configuration present. A failed provider call flips us to DEGRADED
-            # with the real error; a successful one flips back to ONLINE.
             if self.status == GatewayStatus.UNCONFIGURED:
                 self.status = GatewayStatus.ONLINE
         return self.status
@@ -68,17 +67,25 @@ class ModelGateway:
             "api_base": settings.model_api_base or None,
             "api_key_set": bool(settings.model_api_key),
             "status": self.status.value,
+            "active_model": getattr(self, "active_model", None),
+            "candidate_models": self.candidate_models(),
             "requests_served": self.requests_served,
             "last_error": self.last_error,
         }
 
-    async def complete(self, request: ModelRequest) -> ModelResponse:
-        """Send a completion request through the configured provider.
+    def candidate_models(self) -> list[str]:
+        """Models to try, in order. Configured model first, then FROGE_MODEL_FALLBACKS."""
+        ordered: list[str] = []
+        if settings.model_name:
+            ordered.append(settings.model_name)
+        extra = getattr(settings, "model_fallbacks", "") or ""
+        for name in (n.strip() for n in extra.split(",")):
+            if name and name not in ordered:
+                ordered.append(name)
+        return ordered
 
-        If the provider is unconfigured or its call fails we return a clear
-        degraded response with the real error instead of pretending a model
-        answered.
-        """
+    async def complete(self, request: ModelRequest) -> ModelResponse:
+        """Try the configured model first; on failure walk the configured fallback list."""
         await bus.publish(
             EventType.MODEL_REQUEST_STARTED,
             f"Model request started (employee={request.employee_id})",
@@ -97,24 +104,38 @@ class ModelGateway:
                 "FROGE_MODEL_API_BASE (and FROGE_MODEL_API_KEY if needed) in the environment.",
             )
 
-        try:
-            result = await provider_complete(request.prompt, max_tokens=request.max_tokens)
-        except ProviderError as exc:
+        result = None
+        last_exc: Exception | None = None
+        used_model: str | None = None
+        tried: list[str] = []
+        for model in self.candidate_models() or [None]:
+            tried.append(model or "<none>")
+            try:
+                result = await provider_complete(request.prompt, max_tokens=request.max_tokens,
+                                                 model=model)
+                used_model = model
+                break
+            except ProviderError as exc:
+                last_exc = exc
+                continue
+        if result is None:
             self.status = GatewayStatus.DEGRADED
-            self.last_error = str(exc)
-            return await self._fail(request, started, str(exc))
+            self.last_error = str(last_exc)
+            return await self._fail(request, started,
+                                    f"all configured models failed ({', '.join(tried)}): {last_exc}")
 
         latency = (time.perf_counter() - started) * 1000
         self.requests_served += 1
         self.status = GatewayStatus.ONLINE
         self.last_error = None
+        self.active_model = used_model
         await bus.publish(
             EventType.MODEL_REQUEST_COMPLETED,
-            f"Model request completed in {latency:.0f}ms",
+            f"Model request completed in {latency:.0f}ms (model={used_model})",
             source="model_gateway",
             mission_id=request.mission_id,
             employee_id=request.employee_id,
-            metadata={"latency_ms": latency},
+            metadata={"latency_ms": latency, "model": used_model},
         )
         return ModelResponse(text=result["text"], latency_ms=latency, usage=result.get("usage"))
 
