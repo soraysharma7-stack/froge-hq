@@ -14,11 +14,14 @@ body {
 }
 
 body {
-  /* subtle blueprint grid texture behind the panels */
+  /* layered command-center backdrop: vignette + blueprint grid + top glow */
   background-image:
-    linear-gradient(rgba(45, 212, 191, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(45, 212, 191, 0.03) 1px, transparent 1px);
-  background-size: 32px 32px;
+    radial-gradient(ellipse 90% 60% at 50% -10%, rgba(45, 212, 191, 0.09), transparent 60%),
+    radial-gradient(ellipse 120% 100% at 50% 110%, rgba(10, 10, 20, 0.9), transparent 70%),
+    linear-gradient(rgba(45, 212, 191, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(45, 212, 191, 0.035) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
