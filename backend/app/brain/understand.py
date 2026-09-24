@@ -45,12 +45,15 @@ def understand(objective: str) -> dict[str, Any]:
 
 
 def _classify(text: str) -> str:
+    # Priority: build/code intent beats verification beats content beats general.
+    if any(h in text for h in ("build", "code", "implement", "fix", "script", "app", "website", "program", "develop", "create")):
+        return "engineering"
+    if any(h in text for h in ("read", "show", "list", "open", "inspect")) and any(h in text for h in ("file", "folder", "directory", "code")):
+        return "file_read"
     if any(h in text for h in ("report", "summarize", "summarise", "research", "write")):
         return "content_generation"
     if any(h in text for h in ("test", "verify", "qa", "check")):
         return "verification"
-    if any(h in text for h in ("build", "code", "implement", "fix")):
-        return "engineering"
     return "general"
 
 
