@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from app.tools import web_tools, workspace_tools
+from app.tools import open_tools, web_tools, workspace_tools
 
 
 @dataclass
@@ -93,4 +93,24 @@ register(Skill(
     input_schema={"relative_path": "string"},
     execute=workspace_tools.workspace_file_delete,
     output_schema={"path": "string", "deleted": "boolean"},
+))
+
+register(Skill(
+    id="open_url",
+    name="Open URL",
+    description="Open a website in the user's browser (frontend opens it).",
+    permissions=["open:url"],
+    input_schema={"url": "string"},
+    execute=open_tools.open_url,
+    output_schema={"action": "string", "url": "string"},
+))
+
+register(Skill(
+    id="open_app",
+    name="Open App",
+    description="Open a local app (VS Code, Notepad, Calculator) — only on your device.",
+    permissions=["open:app"],
+    input_schema={"app": "string"},
+    execute=open_tools.open_app,
+    output_schema={"action": "string", "app": "string"},
 ))
