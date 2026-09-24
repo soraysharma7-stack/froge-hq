@@ -134,9 +134,14 @@ async def run_brain_loop(*, mission_id: str, objective: str, title: str,
         args: dict[str, Any] = {}
         if step["skill"] == "filesystem_write":
             args = {"relative_path": relative_path, "content": content}
-        elif step["skill"] == "filesystem_verify":
+        elif step["skill"] == "filesystem_append":
+            args = {"relative_path": relative_path, "content": content}
+        elif step["skill"] in ("filesystem_verify", "filesystem_read", "filesystem_delete"):
             args = {"relative_path": relative_path}
-            _set_state(emp_id, EmployeeState.WAITING)
+            if step["skill"] == "filesystem_verify":
+                _set_state(emp_id, EmployeeState.WAITING)
+        elif step["skill"] == "filesystem_list":
+            args = {"relative_path": "."}
         elif step["skill"] == "web_search":
             args = {"query": step.get("query", objective), "max_results": 5}
 
