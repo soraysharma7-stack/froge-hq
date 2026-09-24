@@ -89,5 +89,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ goal }),
     }),
+  callBoardroom: (topic: string, participants?: string[]) =>
+    request<any>("/api/boardroom", {
+      method: "POST",
+      body: JSON.stringify({ topic, participants }),
+    }),
   monitoring: () => request<any>("/api/monitoring"),
 };
