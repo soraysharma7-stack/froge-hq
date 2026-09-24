@@ -79,7 +79,8 @@ def seed_defaults() -> None:
         role="Software Engineer",
         personality="methodical, pragmatic",
         capabilities=["coding", "file_operations"],
-        skills=["filesystem_write"], tools=["workspace_file_writer"], security_level=2,
+        skills=["filesystem_write", "filesystem_read", "filesystem_list", "filesystem_append", "filesystem_delete"],
+        tools=["workspace_file_writer"], security_level=2,
     ))
     register(Employee(
         id="sam", name="Sam", department="qa",
