@@ -86,6 +86,51 @@ export default function DashboardPage() {
     if (auth === "authed" && !getToken()) setAuth("required");
   }, [auth]);
 
+  const callMeeting = useCallback(async () => {
+    const topic = window.prompt("Meeting topic — what should the team leads discuss?", "Current priorities and next steps");
+    if (!topic) return;
+    dispatch({ type: "USER_MESSAGE", text: `/meeting ${topic}` });
+    try {
+      const session = await api.callBoardroom(topic);
+      const positions = session?.positions || session?.participants || session?.deliberation || [];
+      const list = Array.isArray(positions) ? positions : [];
+      if (list.length === 0) {
+        dispatch({
+          type: "EVENT",
+          envelope: { kind: "live", event: { id: `brd-${Date.now()}`, type: "BOARDROOM_STARTED",
+            message: "Meeting called, but no positions returned yet.", source: "maya",
+            severity: "info", timestamp: Date.now() } },
+        });
+        return;
+      }
+      for (const p of list) {
+        dispatch({
+          type: "EVENT",
+          envelope: { kind: "live", event: { id: `brd-${p.participant || p.name || Math.random()}`,
+            type: "BOARDROOM_STARTED",
+            message: `${p.position || p.recommendation || p.stance || ""}`,
+            source: String(p.participant || p.name || "team"), severity: "info",
+            timestamp: Date.now() } },
+        });
+      }
+      if (session?.synthesis) {
+        dispatch({
+          type: "EVENT",
+          envelope: { kind: "live", event: { id: `brd-syn-${Date.now()}`, type: "BOARDROOM_STARTED",
+            message: `Synthesis: ${session.synthesis}`, source: "maya", severity: "success",
+            timestamp: Date.now() } },
+        });
+      }
+    } catch (e) {
+      dispatch({
+        type: "EVENT",
+        envelope: { kind: "live", event: { id: `brd-err-${Date.now()}`, type: "MISSION_FAILED",
+          message: `Meeting failed: ${e instanceof Error ? e.message : "unknown"}`,
+          source: "system", severity: "error", timestamp: Date.now() } },
+      });
+    }
+  }, []);
+
   const sendCommand = useCallback(async (text: string) => {
     dispatch({ type: "USER_MESSAGE", text });
     try {
@@ -188,6 +233,7 @@ export default function DashboardPage() {
         status={status}
         stopAll={state.stopAll}
         onOpenCommand={() => setCommandOpen(true)}
+        onCallMeeting={callMeeting}
         onStopAll={stopAll}
         onRelease={releaseStop}
       />
