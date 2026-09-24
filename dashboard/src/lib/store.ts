@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * Global dashboard state — a plain useReducer store, no external library.
  * Backend event types (from app/events/bus.py EventType) are mapped onto
