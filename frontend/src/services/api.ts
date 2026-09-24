@@ -100,6 +100,12 @@ export async function startMission(title: string, objective: string, simulate = 
   return r
 }
 
+export async function callBoardroom(topic: string, participants?: string[]) {
+  const r = await api.post('/boardroom', { topic, participants })
+  await refreshState()
+  return r
+}
+
 export async function stopAll() {
   await api.post('/stop-all')
   useHQ.getState().setStopAll(true)
