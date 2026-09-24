@@ -5,7 +5,7 @@ import { connectEvents, refreshState, stopAll as stopAllApi, releaseStopAll, cal
 import CommandPalette from './CommandPalette'
 
 const NAV = [
-  ['/', 'Command Center'], ['/office', 'Office'], ['/boardroom', 'Boardroom'],
+  ['/', 'Command Center'], ['/office', 'Office'], ['/agents', 'Agents (115)'], ['/boardroom', 'Boardroom'],
   ['/model-gateway', 'Model Gateway'], ['/memory', 'Memory'], ['/skills', 'Skills'],
   ['/security', 'Security'], ['/qa', 'QA'], ['/monitoring', 'Monitoring'],
   ['/artifacts', 'Artifacts'], ['/decisions', 'Decisions'], ['/settings', 'Settings'],
