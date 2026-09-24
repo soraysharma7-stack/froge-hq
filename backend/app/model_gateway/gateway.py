@@ -1,11 +1,11 @@
-"""FROGÉ MODEL GATEWAY — clean abstraction over the configured model/provider.
+"""FROGÉ MODEL GATEWAY — clean abstraction over the configured Arena AI Agent model/provider.
 
 Rules (per spec):
 - The model/provider comes ONLY from configuration (settings / environment).
-- No model name is ever hard-coded or invented by the backend.
-- Optional FROGE_MODEL_FALLBACKS provides an ordered list of alternates; the
-  gateway tries the configured model first, then each fallback, and reports
-  which model actually answered. Only configured models are ever used.
+- No model name is ever hard-coded.
+- No silent fallback model. If the configured model is unavailable, we walk the
+  configured fallback list and report which model actually answered, or degrade
+  honestly if every configured model fails.
 """
 from __future__ import annotations
 
@@ -74,7 +74,9 @@ class ModelGateway:
         }
 
     def candidate_models(self) -> list[str]:
-        """Models to try, in order. Configured model first, then FROGE_MODEL_FALLBACKS."""
+        """Models to try, in order. The configured model is always tried first;
+        optional FROGE_MODEL_FALLBACKS (comma-separated) provides alternates.
+        Only models you configured are ever used — nothing is invented."""
         ordered: list[str] = []
         if settings.model_name:
             ordered.append(settings.model_name)
@@ -85,7 +87,14 @@ class ModelGateway:
         return ordered
 
     async def complete(self, request: ModelRequest) -> ModelResponse:
-        """Try the configured model first; on failure walk the configured fallback list."""
+        """Send a completion request through the configured provider.
+
+        Tries the configured model first; on a clear failure it walks the
+        configured fallback list and reports which model actually answered.
+        If the provider is unconfigured or every call fails we return a clear
+        degraded response with the real error instead of pretending a model
+        answered.
+        """
         await bus.publish(
             EventType.MODEL_REQUEST_STARTED,
             f"Model request started (employee={request.employee_id})",
