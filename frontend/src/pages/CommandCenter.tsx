@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useHQ } from '../store'
 import { startMission } from '../services/api'
 import { Badge, StatusBadge } from '../components/ui'
+import VoiceMic from '../components/VoiceMic'
 
 
 const SEV: Record<string, string> = { info: 'text-slate-300', warning: 'text-amber-300', error: 'text-red-400' }
@@ -48,6 +49,7 @@ export default function CommandCenter() {
             onKeyDown={(e) => e.key === 'Enter' && submit()}
             disabled={stopAll}
           />
+          <VoiceMic onTranscript={(t) => setObjective(t)} />
           <button onClick={() => submit()} disabled={busy || stopAll}
             className="rounded-lg bg-cyan-500/80 px-4 py-2 text-sm font-semibold text-black hover:bg-cyan-400 disabled:opacity-40">
             {busy ? 'RUNNING…' : 'START MISSION'}
