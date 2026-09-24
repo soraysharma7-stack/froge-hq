@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useHQ } from '../store'
-import { connectEvents, refreshState, stopAll as stopAllApi, releaseStopAll } from '../services/api'
+import { connectEvents, refreshState, stopAll as stopAllApi, releaseStopAll, callBoardroom } from '../services/api'
 import CommandPalette from './CommandPalette'
 
 const NAV = [
@@ -14,8 +14,17 @@ const NAV = [
 export default function Layout() {
   const { wsConnected, stopAll, mode, gateway, notifications } = useHQ()
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [meetingBusy, setMeetingBusy] = useState(false)
   const navigate = useNavigate()
   const unread = notifications.filter((n) => !n.read).length
+
+  const meeting = async () => {
+    const topic = window.prompt('Meeting topic — team leads kya discuss karein?', 'Current priorities & next steps')
+    if (!topic || meetingBusy) return
+    setMeetingBusy(true)
+    try { await callBoardroom(topic) } finally { setMeetingBusy(false) }
+    navigate('/boardroom')
+  }
 
   useEffect(() => {
     refreshState()
@@ -64,12 +73,18 @@ export default function Layout() {
               </button>
             )}
           </div>
-          <button
-            onClick={() => (stopAll ? releaseStopAll() : stopAllApi())}
-            className={`rounded-lg px-4 py-1.5 font-bold tracking-wider ${
-              stopAll ? 'bg-red-700 text-white animate-pulse' : 'bg-red-600/80 text-white hover:bg-red-500'}`}>
-            {stopAll ? 'STOP ALL ENGAGED — RELEASE' : 'STOP ALL'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={meeting} disabled={meetingBusy}
+              className="rounded-lg border border-cyan-500/40 px-4 py-1.5 text-cyan-200 hover:bg-cyan-500/10 disabled:opacity-40">
+              {meetingBusy ? 'MEETING…' : 'MEETING'}
+            </button>
+            <button
+              onClick={() => (stopAll ? releaseStopAll() : stopAllApi())}
+              className={`rounded-lg px-4 py-1.5 font-bold tracking-wider ${
+                stopAll ? 'bg-red-700 text-white animate-pulse' : 'bg-red-600/80 text-white hover:bg-red-500'}`}>
+              {stopAll ? 'STOP ALL ENGAGED — RELEASE' : 'STOP ALL'}
+            </button>
+          </div>
         </header>
         <main className="flex-1 overflow-y-auto p-6">
           <Outlet />
