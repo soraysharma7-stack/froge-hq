@@ -72,14 +72,14 @@ def seed_defaults() -> None:
         role="Chief AI Orchestrator",
         personality="strategic, calm, direct, honest, concise",
         capabilities=["orchestration", "planning", "delegation", "verification"],
-        skills=["mission_planning"], tools=[], security_level=5,
+        skills=["mission_planning", "open_url", "open_app"], tools=[], security_level=5,
     ))
     register(Employee(
         id="alex", name="Alex", department="software_engineering",
         role="Software Engineer",
         personality="methodical, pragmatic",
         capabilities=["coding", "file_operations"],
-        skills=["filesystem_write", "filesystem_read", "filesystem_list", "filesystem_append", "filesystem_delete"],
+        skills=["filesystem_write", "filesystem_read", "filesystem_list", "filesystem_append", "filesystem_delete", "open_url"],
         tools=["workspace_file_writer"], security_level=2,
     ))
     register(Employee(
