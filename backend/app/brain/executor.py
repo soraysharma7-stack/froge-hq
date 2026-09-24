@@ -23,6 +23,8 @@ _TOOL_RISK: dict[str, policy.Risk] = {
     "workspace_file_append": policy.Risk.MEDIUM,
     "workspace_file_delete": policy.Risk.HIGH,  # destructive → approval required
     "web_search": policy.Risk.LOW,
+    "open_url": policy.Risk.LOW,
+    "open_app": policy.Risk.MEDIUM,
 }
 
 
