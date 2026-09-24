@@ -29,10 +29,16 @@ _TASK_STEP_TEMPLATES: dict[str, list[dict[str, Any]]] = {
          "tool": "workspace_file_verify", "permission": "workspace:read"},
     ],
     "engineering": [
+        {"action": "filesystem_list", "owner": "alex", "skill": "filesystem_list",
+         "tool": "workspace_list_dir", "permission": "workspace:read"},
         {"action": "filesystem_write", "owner": "alex", "skill": "filesystem_write",
          "tool": "workspace_file_write", "permission": "workspace:write"},
         {"action": "filesystem_verify", "owner": "sam", "skill": "filesystem_verify",
          "tool": "workspace_file_verify", "permission": "workspace:read"},
+    ],
+    "file_read": [
+        {"action": "filesystem_read", "owner": "alex", "skill": "filesystem_read",
+         "tool": "workspace_file_read", "permission": "workspace:read"},
     ],
     "general": [
         {"action": "filesystem_write", "owner": "alex", "skill": "filesystem_write",
