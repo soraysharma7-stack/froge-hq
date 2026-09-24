@@ -11,6 +11,7 @@ import time
 from app.employees import registry as employees
 from app.events.bus import bus, EventType
 from app.model_gateway.gateway import gateway, ModelRequest
+from app.tools import open_tools
 from app.voice import router as voice
 
 # Which lead handles which intent (deterministic routing — the backend decides,
@@ -57,6 +58,28 @@ async def chat_reply(text: str, *, mission_id: str | None = None) -> dict:
 
     await bus.publish(EventType.SYSTEM, f"[user] {text}", source="user",
                       mission_id=mission_id, metadata={"kind": "chat_user"})
+
+    # Direct open command — "open youtube", "open vs code", "youtube kholo", etc.
+    if intent in ("open", "assign") and any(k in text.lower() for k in ("open", "kholo", "khol do", "launch", "start", "chalao")):
+        try:
+            action = open_tools.resolve_open_command(text)
+        except Exception as exc:
+            action = {"type": "error", "error": str(exc)}
+        who = "maya"
+        if action.get("type") == "url":
+            reply = f"Opening {action['url']} in your browser now."
+        elif action.get("type") == "app":
+            if action.get("action") == "opened":
+                reply = f"Opened {action.get('label', 'the app')} on your device."
+            else:
+                reply = action.get("note", "I can't open that from here.")
+        else:
+            reply = action.get("error", "I don't know how to open that.")
+        await bus.publish(EventType.SYSTEM, f"[{who}] {reply}", source=who,
+                          mission_id=mission_id, employee_id=lead_id,
+                          metadata={"kind": "chat_reply", "action": action})
+        return {"reply": reply, "from": who, "action": action, "language": language,
+                "model_used": False, "timestamp": time.time()}
 
     # Try the model for a natural reply within the lead's role; degrade honestly.
     reply: str
