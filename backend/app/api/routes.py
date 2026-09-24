@@ -216,6 +216,18 @@ def employee_list():
     return [e.to_dict() for e in employees.all_employees()]
 
 
+@router.get("/roster")
+def full_roster():
+    """The full 115-agent roster (data table; idle until activated)."""
+    from app.employees import roster as roster_mod
+    return {
+        "total": len(roster_mod.ROSTER),
+        "agents": roster_mod.ROSTER,
+        "leads": [r["id"] for r in roster_mod.leads()],
+        "departments": sorted({r["department"] for r in roster_mod.ROSTER}),
+    }
+
+
 @router.get("/employees/{employee_id}")
 def employee_detail(employee_id: str):
     e = employees.get(employee_id)
