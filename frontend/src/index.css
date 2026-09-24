@@ -191,6 +191,11 @@ body {
 .cc-chat-who { @apply font-mono text-cyan-400/90 shrink-0; }
 .cc-chat-text { @apply text-slate-300; }
 .cc-chat-input { display: flex; gap: 6px; position: relative; z-index: 1; }
+.cc-chat-me { justify-content: flex-end; }
+.cc-chat-who.cc-me { @apply text-amber-300; }
+.cc-chat-text.cc-mine { @apply text-cyan-100 bg-cyan-500/10 border border-cyan-500/30 rounded px-2 py-0.5; }
+.cc-chat-sys { opacity: 0.6; }
+
 
 /* missions */
 .cc-mission-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; position: relative; z-index: 1; }
