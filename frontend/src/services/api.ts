@@ -106,6 +106,11 @@ export async function callBoardroom(topic: string, participants?: string[]) {
   return r
 }
 
+export async function sendChat(text: string) {
+  const r = await api.post('/chat', { text })
+  return r as { reply: string; from: string; model_used: boolean }
+}
+
 export async function stopAll() {
   await api.post('/stop-all')
   useHQ.getState().setStopAll(true)
