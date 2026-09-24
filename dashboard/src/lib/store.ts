@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Global dashboard state — a plain useReducer store, no external library.
  * Backend event types (from app/events/bus.py EventType) are mapped onto
@@ -156,6 +158,21 @@ function applyEvent(state: DashboardState, envelope: WsEnvelope): DashboardState
 
   if (ev.type === "MISSION_PAUSED") stopAll = true;
   if (ev.type === "SYSTEM" && /stop all released/i.test(ev.message)) stopAll = false;
+
+  // Decision summaries — Maya's structured reasoning, shown as agent chat lines
+  if (envelope.kind === "live" && ev.type === "DECISION_SUMMARY") {
+    const meta = ev.metadata || {};
+    chat = [
+      ...chat,
+      {
+        id: ev.id,
+        from: "agent" as const,
+        agentName: "Maya",
+        text: `[${String(meta.stage || "decision")}] ${String(meta.decision || ev.message)} — ${String(meta.reason || "")}`,
+        at: Date.now(),
+      },
+    ].slice(-MAX_CHAT);
+  }
 
   if (
     envelope.kind === "live" &&
