@@ -18,6 +18,10 @@ from app.tools.workspace_tools import ToolPermissionError
 _TOOL_RISK: dict[str, policy.Risk] = {
     "workspace_file_write": policy.Risk.MEDIUM,
     "workspace_file_verify": policy.Risk.LOW,
+    "workspace_file_read": policy.Risk.LOW,
+    "workspace_list_dir": policy.Risk.LOW,
+    "workspace_file_append": policy.Risk.MEDIUM,
+    "workspace_file_delete": policy.Risk.HIGH,  # destructive → approval required
     "web_search": policy.Risk.LOW,
 }
 
