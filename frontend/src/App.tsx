@@ -6,6 +6,7 @@ import Login from './pages/Login'
 import Layout from './components/Layout'
 import CommandCenter from './pages/CommandCenter'
 import Office from './pages/Office'
+import Agents from './pages/Agents'
 import MissionDetail from './pages/MissionDetail'
 import { DepartmentPage, EmployeePage } from './pages/Generic'
 import Boardroom from './pages/Boardroom'
@@ -22,10 +23,9 @@ export default function App() {
   useEffect(() => {
     checkAuthConfig()
       .then((required) => {
-        // If the deployment requires auth, a stored token must exist; otherwise show Login.
         setAuthed(!required || !!getToken())
       })
-      .catch(() => setAuthed(true)) // backend unreachable → dev mode passthrough
+      .catch(() => setAuthed(true))
       .finally(() => setChecking(false))
   }, [setAuthed])
 
@@ -38,6 +38,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<CommandCenter />} />
           <Route path="/office" element={<Office />} />
+          <Route path="/agents" element={<Agents />} />
           <Route path="/mission/:id" element={<MissionDetail />} />
           <Route path="/department/:id" element={<DepartmentPage />} />
           <Route path="/employee/:id" element={<EmployeePage />} />
