@@ -54,3 +54,43 @@ register(Skill(
     execute=web_tools.web_search,
     output_schema={"query": "string", "count": "number", "results": "list"},
 ))
+
+register(Skill(
+    id="filesystem_read",
+    name="Workspace File Read",
+    description="Read a file inside the workspace sandbox (bounded content).",
+    permissions=["workspace:read"],
+    input_schema={"relative_path": "string", "max_bytes": "number (optional)"},
+    execute=workspace_tools.workspace_file_read,
+    output_schema={"path": "string", "bytes": "number", "content": "string"},
+))
+
+register(Skill(
+    id="filesystem_list",
+    name="Workspace List Directory",
+    description="List a directory inside the workspace sandbox.",
+    permissions=["workspace:read"],
+    input_schema={"relative_path": "string (optional)"},
+    execute=workspace_tools.workspace_list_dir,
+    output_schema={"path": "string", "count": "number", "entries": "list"},
+))
+
+register(Skill(
+    id="filesystem_append",
+    name="Workspace File Append",
+    description="Append text to a file inside the workspace sandbox.",
+    permissions=["workspace:write"],
+    input_schema={"relative_path": "string", "content": "string"},
+    execute=workspace_tools.workspace_file_append,
+    output_schema={"path": "string", "bytes": "number", "status": "string"},
+))
+
+register(Skill(
+    id="filesystem_delete",
+    name="Workspace File Delete",
+    description="Delete a file inside the workspace sandbox (requires approval).",
+    permissions=["workspace:write", "destructive"],
+    input_schema={"relative_path": "string"},
+    execute=workspace_tools.workspace_file_delete,
+    output_schema={"path": "string", "deleted": "boolean"},
+))
