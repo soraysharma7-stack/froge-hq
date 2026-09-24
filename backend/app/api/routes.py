@@ -33,6 +33,7 @@ from app.search import global_search
 from app.security import policy
 from app.skills.registry import SKILLS
 from app.voice import router as voice
+from app.api import chat as chatmod
 
 router = APIRouter()
 
@@ -486,6 +487,17 @@ class VoiceCommand(BaseModel):
 @router.post("/voice/route")
 def voice_route(payload: VoiceCommand):
     return voice.route(payload.utterance)
+
+
+# ---------- Chat (two-way: user talks, Maya/leads reply in the chat) ----------
+class ChatMessage(BaseModel):
+    text: str
+    mission_id: str | None = None
+
+
+@router.post("/chat")
+async def chat(payload: ChatMessage):
+    return await chatmod.chat_reply(payload.text, mission_id=payload.mission_id)
 
 
 # ---------- Prompt compiler ----------
