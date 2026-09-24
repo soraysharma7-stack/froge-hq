@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Command, OctagonX, Play } from "lucide-react";
+import { Activity, Command, OctagonX, Play, Users } from "lucide-react";
 import { Badge, GlowButton } from "./ui/panel";
 import type { ConnectionStatus } from "@/hooks/useFrogeSocket";
 
@@ -8,12 +8,14 @@ export function TopBar({
   status,
   stopAll,
   onOpenCommand,
+  onCallMeeting,
   onStopAll,
   onRelease,
 }: {
   status: ConnectionStatus;
   stopAll: boolean;
   onOpenCommand: () => void;
+  onCallMeeting: () => void;
   onStopAll: () => void;
   onRelease: () => void;
 }) {
@@ -54,6 +56,10 @@ export function TopBar({
             <Activity className="h-3 w-3" /> LIVE
           </Badge>
         )}
+
+        <GlowButton onClick={onCallMeeting}>
+          <Users className="mr-1 inline h-3.5 w-3.5" /> Meeting
+        </GlowButton>
 
         <GlowButton onClick={onOpenCommand}>
           <Command className="mr-1 inline h-3.5 w-3.5" /> Type Command
