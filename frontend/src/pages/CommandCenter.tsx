@@ -7,6 +7,7 @@ import OfficeMap from '../components/OfficeMap'
 import Telemetry from '../components/Telemetry'
 import NeuralNet from '../components/NeuralNet'
 import ChatBox from '../components/ChatBox'
+import Globe3D from '../components/Globe3D'
 
 const SEV: Record<string, string> = { info: 'text-slate-300', warning: 'text-amber-300', error: 'text-red-400' }
 
@@ -49,6 +50,7 @@ export default function CommandCenter() {
 
       <Telemetry />
       <NeuralNet />
+      <Globe3D />
 
       {/* Row 2: office floor + live stream + chat */}
       <OfficeMap />
