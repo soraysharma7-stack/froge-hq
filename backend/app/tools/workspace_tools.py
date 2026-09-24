@@ -46,3 +46,48 @@ def workspace_file_verify(relative_path: str) -> dict:
     exists = target.is_file()
     size = target.stat().st_size if exists else 0
     return {"path": str(target), "exists": exists, "bytes": size, "verified": exists and size > 0}
+
+
+def workspace_file_read(relative_path: str, max_bytes: int = 8000) -> dict:
+    """Read a file inside the sandbox. Returns bounded content."""
+    target = _resolve_in_sandbox(relative_path)
+    if not target.is_file():
+        raise ToolPermissionError(f"NOT_FOUND: no such file in workspace: {relative_path}")
+    data = target.read_bytes()[:max_bytes]
+    return {"path": str(target), "bytes": target.stat().st_size,
+            "content": data.decode("utf-8", errors="replace")}
+
+
+def workspace_list_dir(relative_path: str = ".", max_entries: int = 200) -> dict:
+    """List a directory inside the sandbox (one level). Missing dir = empty list."""
+    target = _resolve_in_sandbox(relative_path)
+    if not target.exists():
+        return {"path": str(target), "count": 0, "entries": [], "note": "directory does not exist yet"}
+    if not target.is_dir():
+        raise ToolPermissionError(f"NOT_A_DIRECTORY: {relative_path}")
+    entries = []
+    for child in sorted(target.iterdir())[:max_entries]:
+        entries.append({"name": child.name, "type": "dir" if child.is_dir() else "file",
+                        "bytes": child.stat().st_size if child.is_file() else None})
+    return {"path": str(target), "count": len(entries), "entries": entries}
+
+
+def workspace_file_append(relative_path: str, content: str) -> dict:
+    """Append text to a file inside the sandbox (creates if missing)."""
+    target = _resolve_in_sandbox(relative_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("a", encoding="utf-8") as fh:
+        fh.write(content)
+    return {"path": str(target), "bytes": target.stat().st_size, "status": "appended"}
+
+
+def workspace_file_delete(relative_path: str) -> dict:
+    """Delete a file inside the sandbox. Destructive — the policy engine
+    requires approval for this via the brain's permission step."""
+    target = _resolve_in_sandbox(relative_path)
+    if not target.exists():
+        raise ToolPermissionError(f"NOT_FOUND: no such file in workspace: {relative_path}")
+    if target.is_dir():
+        raise ToolPermissionError(f"SECURITY_BLOCK: refusing to delete a directory: {relative_path}")
+    target.unlink()
+    return {"path": str(target), "deleted": True}
