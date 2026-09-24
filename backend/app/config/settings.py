@@ -14,12 +14,15 @@ class Settings(BaseSettings):
     max_browser_instances: int = 1
     max_queue_size: int = 50
 
-    # Model Gateway — the Arena AI Agent provider is supplied via config only.
+    # Model Gateway — the provider is supplied via config only.
     # No model name is hard-coded anywhere in the codebase.
     model_provider: str = "arena"          # provider identifier from env
-    model_name: str = ""                    # selected Arena AI Agent model, from env
+    model_name: str = ""                    # selected model, from env
     model_api_base: str = ""                # provider endpoint, from env
     model_api_key: str = ""                 # provider key, from env
+    # Optional ordered fallbacks (comma-separated). Only models you list here are
+    # ever tried, after FROGE_MODEL_NAME. Nothing is invented by the backend.
+    model_fallbacks: str = ""
 
     # Owner sign-in (empty = open dev mode, no login required)
     owner_email: str = ""
